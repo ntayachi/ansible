@@ -1,0 +1,16 @@
+hosts: localhost
+connection: local
+gather_facts: false
+
+vars_files:
+  - vault.yml
+
+vars:
+  - username: nafaa.tayachi
+  - instanceId: "<INSTANCE-ID>"
+
+tasks:
+
+- name: Get MFA token
+  shell: oathtool --totp --base32 <SECRET>
+  register: mfa_token
