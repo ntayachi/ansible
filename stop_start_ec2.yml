@@ -12,6 +12,8 @@ vars:
   - targetAccountId: "<target-account-id>"
   - targetRole: "<target-role>"
   - roleSession: "<role-session-name>"
+  - ec2Dns: "<ec2-machine-dns>"
+  - region: "<region>"
 
 tasks:
 
@@ -34,3 +36,29 @@ tasks:
   tags:
   - start
   - stop
+
+- name: Start server
+  ec2:
+    aws_access_key: "{{ assumed_role.sts_creds.access_key }}"
+    aws_secret_key: "{{ assumed_role.sts_creds.secret_key }}"
+    security_token: "{{ assumed_role.sts_creds.session_token }}"
+    region: "{{ region }}"
+    state: "running"
+    instance_ids: "{{ instanceId }}"
+  tags: start
+
+- name: Wait for SSH
+  wait_for:
+    host: "{{ ec2dns }}"
+    port: 22
+  tags: start
+
+- name: Stop server
+  ec2:
+    aws_access_key: "{{ assumed_role.sts_creds.access_key }}"
+    aws_secret_key: "{{ assumed_role.sts_creds.secret_key }}"
+    security_token: "{{ assumed_role.sts_creds.session_token }}"
+    region: "{{ region }}"
+    state: "stopped"
+    instance_ids: "{{ instanceId }}"
+  tags: stop
