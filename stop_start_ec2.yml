@@ -1,64 +1,93 @@
-hosts: localhost
-connection: local
-gather_facts: false
+- hosts: localhost
+  connection: local
+  gather_facts: false
 
-vars_files:
-  - vault.yml
+  vars_files:
+    - vault.yml
 
-vars:
-  - username:  "<aws-username>"
-  - instanceId: "<ec2-instance-id>"
-  - accountId: "<source-account-id>"
-  - targetAccountId: "<target-account-id>"
-  - targetRole: "<target-role>"
-  - roleSession: "<role-session-name>"
-  - ec2Dns: "<ec2-instance-dns>"
-  - region: "<region>"
+  vars:
+    username:  "<aws-username>"
+    instanceId: "<ec2-instance-id>"
+    accountId: "<source-account-id>"
+    targetAccountId: "<target-account-id>"
+    targetRole: "<target-role>"
+    roleSession: "<role-session-name>"
+    ec2Dns: "<ec2-instance-dns>"
+    region: "<region>"
 
-tasks:
+  tasks:
 
-- name: Get MFA token
-  shell: oathtool --totp --base32 <secret>
-  register: mfa_token
-  tags:
-  - start
-  - stop
+  - name: Get MFA token
+    shell: oathtool --totp --base32 <secret>
+    register: mfa_token
+    tags:
+    - start
+    - stop
 
-- name: Switch to the target role
-  sts_assume_role:
-    aws_access_key: "{{ ec2_access_key }}"
-    aws_secret_key: "{{ ec2_secret_key }}"
-    mfa_serial_number: "arn:aws:iam::{{ accountId }}:mfa/{{ username }}"
-    mfa_token: "{{ mfa_token['stdout'] }}"
-    role_arn: "arn:aws:iam::{{ targetAccountId }}:role/{{ targetRole }}"
-    role_session_name: "{{ roleSession }}"
-  register: assumed_role
-  tags:
-  - start
-  - stop
+  - name: Switch to the target role
+    sts_assume_role:
+      aws_access_key: "{{ ec2_access_key }}"
+      aws_secret_key: "{{ ec2_secret_key }}"
+      mfa_serial_number: "arn:aws:iam::{{ accountId }}:mfa/{{ username }}"
+      mfa_token: "{{ mfa_token['stdout'] }}"
+      role_arn: "arn:aws:iam::{{ targetAccountId }}:role/{{ targetRole }}"
+      role_session_name: "{{ roleSession }}"
+    register: assumed_role
+    tags:
+    - start
+    - stop
 
-- name: Start server
-  ec2:
-    aws_access_key: "{{ assumed_role.sts_creds.access_key }}"
-    aws_secret_key: "{{ assumed_role.sts_creds.secret_key }}"
-    security_token: "{{ assumed_role.sts_creds.session_token }}"
-    region: "{{ region }}"
-    state: "running"
-    instance_ids: "{{ instanceId }}"
-  tags: start
+  - name: Start server
+    ec2:
+      aws_access_key: "{{ assumed_role.sts_creds.access_key }}"
+      aws_secret_key: "{{ assumed_role.sts_creds.secret_key }}"
+      security_token: "{{ assumed_role.sts_creds.session_token }}"
+      region: "{{ region }}"
+      state: "running"
+      instance_ids: "{{ instanceId }}"
+    tags: start
 
-- name: Wait for SSH
-  wait_for:
-    host: "{{ ec2dns }}"
-    port: 22
-  tags: start
+  - name: Wait for SSH
+    wait_for:
+      host: "{{ ec2dns }}"
+      port: 22
+    tags: start
 
-- name: Stop server
-  ec2:
-    aws_access_key: "{{ assumed_role.sts_creds.access_key }}"
-    aws_secret_key: "{{ assumed_role.sts_creds.secret_key }}"
-    security_token: "{{ assumed_role.sts_creds.session_token }}"
-    region: "{{ region }}"
-    state: "stopped"
-    instance_ids: "{{ instanceId }}"
-  tags: stop
+  - name: Stop server
+    ec2:
+      aws_access_key: "{{ assumed_role.sts_creds.access_key }}"
+      aws_secret_key: "{{ assumed_role.sts_creds.secret_key }}"
+      security_token: "{{ assumed_role.sts_creds.session_token }}"
+      region: "{{ region }}"
+      state: "stopped"
+      instance_ids: "{{ instanceId }}"
+    tags: stop
+
+- hosts: ec2-instance-dns
+  become: true
+  gather_facts: false
+
+  vars_files: 
+    - vault.yml
+
+  vars:
+    volumes:
+      - device: xvdf
+        passphrase: "{{ xvdf_passphrase }}"
+        name: data1
+        lvm: /dev/mapper/data1
+        directory: /data1
+      - device: xvdg
+        passphrase: "{{ xvdg_passphrase }}"
+        name: data2
+        lvm: /dev/mapper/data2
+        directory: /data2
+
+  tasks:
+
+  - name: Create keyfile
+    copy:
+      content: "{{ item:passphrase }}"
+      dest: "/tmp/{{ item.device }}"
+    loop: "{{ volumes }}"
+    tags: start
