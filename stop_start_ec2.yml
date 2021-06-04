@@ -12,7 +12,7 @@ vars:
   - targetAccountId: "<target-account-id>"
   - targetRole: "<target-role>"
   - roleSession: "<role-session-name>"
-  - ec2Dns: "<ec2-machine-dns>"
+  - ec2Dns: "<ec2-instance-dns>"
   - region: "<region>"
 
 tasks:
