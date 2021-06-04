@@ -91,3 +91,15 @@
       dest: "/tmp/{{ item.device }}"
     loop: "{{ volumes }}"
     tags: start
+
+  - name: Decrypt the volumes
+    shell: cryptsetup luksOpen "/dev/{{ item.device }}" {{ item.name }} -d "/tmp/{{ item.device }}"
+    loop: "{{ volumes }}"
+    tags: start
+
+  - name: Remove keyfile
+    file:
+      path: "/tmp/{{ item }}"
+      state: "absent"
+    loop: "{{ volumes }}"
+    tags: start
