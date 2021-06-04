@@ -99,7 +99,20 @@
 
   - name: Remove keyfile
     file:
-      path: "/tmp/{{ item }}"
+      path: "/tmp/{{ item.device }}"
       state: "absent"
     loop: "{{ volumes }}"
+    tags: start
+
+  - name: Mount the volmues
+    shell: mount {{ item.lvm }} {{ item.directory }}
+    loop: "{{ volumes }}"
+    tags: start
+
+  - name: Start services
+    become_user: user1
+    shell: |
+      source /etc/profile
+      cd /data1/services
+      ./start.sh
     tags: start
